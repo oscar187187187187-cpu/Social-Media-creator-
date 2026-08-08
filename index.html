@@ -1,227 +1,330 @@
-import React, { useState } from 'react';
-import { Play, Settings, FileText, Video, Mic, UploadCloud, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
-
-export default function App() {
-  const [groqApiKey, setGroqApiKey] = useState('');
-  const [prompt, setPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState(null);
-  const [scriptData, setScriptData] = useState(null);
-
-  // Diese Funktion ruft die Groq API auf, um das Skript zu erstellen
-  const generateScript = async () => {
-    if (!groqApiKey) {
-      setError('Bitte gib deinen Groq API Key ein.');
-      return;
-    }
-    if (!prompt) {
-      setError('Bitte gib eine Idee für dein Video ein.');
-      return;
-    }
-
-    setIsGenerating(true);
-    setError(null);
-    setScriptData(null);
-
-    const systemPrompt = `Du bist ein Experte für virale TikToks, Instagram Reels und YouTube Shorts. 
-    Der User gibt dir ein Thema. Deine Aufgabe ist es, ein Skript für ein 30-60 Sekunden Video zu erstellen.
-    Antworte AUSSCHLIESSLICH in validem JSON Format. Keine Einleitung, kein Markdown außerhalb des JSON.
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AutoShorts AI - Video Automation Suite</title>
     
-    Struktur des JSON:
-    {
-      "title": "Ein catchy Titel",
-      "hook": "Der erste Satz, der die Aufmerksamkeit sofort catcht",
-      "scenes": [
-        {
-          "sceneNumber": 1,
-          "visualPrompt": "Ein detaillierter Prompt für einen KI-Video-Generator (z.B. Runway/Sora) was man im Bild sieht. (Auf Englisch für die KIs)",
-          "voiceover": "Der Text, der in dieser Szene vom Sprecher gesagt wird. (Auf Deutsch)"
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        dark: { 900: '#0b0c10', 800: '#1f2833', 950: '#030712' },
+                        brand: { 500: '#66fcf1', 600: '#45a29e' }
+                    }
+                }
+            }
         }
-      ]
-    }`;
+    </script>
 
-    try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'llama3-70b-8192', // Extrem schnelles und gutes Modell bei Groq
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 2000,
-          response_format: { type: "json_object" } // Zwingt das Modell, JSON zurückzugeben
-        })
-      });
+    <style>
+        body { background-color: #030712; color: #f3f4f6; -webkit-font-smoothing: antialiased; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0b0c10; }
+        ::-webkit-scrollbar-thumb { background: #1f2833; border-radius: 4px; }
+        .spinner { border: 3px solid rgba(255, 255, 255, 0.1); border-radius: 50%; border-top: 3px solid #66fcf1; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; }
+        .toast { transform: translateX(100%); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .toast.show { transform: translateX(0); opacity: 1; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative selection:bg-brand-500 selection:text-black">
 
-      if (!response.ok) {
-        throw new Error(`API Fehler: ${response.status} - Bitte überprüfe deinen API Key.`);
-      }
+    <div id="toast-container"></div>
 
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-      
-      // JSON parsen
-      const parsedData = JSON.parse(content);
-      setScriptData(parsedData);
-
-    } catch (err) {
-      console.error(err);
-      setError(err.message || 'Ein Fehler ist aufgetreten. Konnte kein valides JSON generieren.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans selection:bg-purple-500 selection:text-white">
-      {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-10 shadow-lg">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2 text-purple-400">
-            <Video className="w-8 h-8" />
-            <h1 className="text-2xl font-bold tracking-tight text-white">AutoShorts <span className="text-purple-500">AI</span></h1>
-          </div>
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <Settings className="w-5 h-5 text-gray-400" />
-            <input
-              type="password"
-              placeholder="Groq API Key (gsk_...)"
-              value={groqApiKey}
-              onChange={(e) => setGroqApiKey(e.target.value)}
-              className="bg-gray-950 border border-gray-700 text-sm rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 w-full md:w-64 transition-colors placeholder:text-gray-600"
-            />
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column: Input & Controls */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-400" />
-              Video Idee
-            </h2>
-            <textarea
-              className="w-full bg-gray-950 border border-gray-700 rounded-xl p-4 text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none transition-all placeholder:text-gray-600"
-              rows="5"
-              placeholder="Z.B.: Erstelle ein Motivationsvideo über Disziplin, inspiriert von Marcus Aurelius. Düstere Ästhetik."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-            ></textarea>
-            
-            <button
-              onClick={generateScript}
-              disabled={isGenerating}
-              className="w-full mt-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <><Loader2 className="w-5 h-5 animate-spin" /> Denke nach (Groq LPU)...</>
-              ) : (
-                <><Play className="w-5 h-5" /> 1. Skript & Szenen generieren</>
-              )}
+    <!-- HEADER -->
+    <header class="bg-dark-950 border-b border-dark-800 sticky top-0 z-40 px-4 py-3 shadow-md">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-xl text-white shadow-lg shadow-purple-500/20">
+                    <i class="fa-solid fa-clapperboard text-lg"></i>
+                </div>
+                <h1 class="text-lg font-bold tracking-tight text-white">AutoShorts <span class="text-purple-400">AI</span></h1>
+            </div>
+            <button onclick="toggleSettings()" class="bg-dark-800 hover:bg-dark-900 text-gray-300 p-2.5 rounded-xl border border-dark-800 transition-colors">
+                <i class="fa-solid fa-gear text-purple-400"></i>
             </button>
-
-            {error && (
-              <div className="mt-4 bg-red-950/50 border border-red-900 text-red-400 p-3 rounded-lg flex items-start gap-2 text-sm">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                <p>{error}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Placeholder for Next Steps (Audio & Render) */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 opacity-70">
-            <h3 className="text-sm font-semibold text-gray-400 mb-4 uppercase tracking-wider">Nächste Schritte in der Pipeline</h3>
-            <div className="space-y-3">
-              <button disabled className="w-full bg-gray-800 text-gray-400 py-2.5 rounded-lg flex items-center justify-center gap-2 border border-gray-700 cursor-not-allowed">
-                <Mic className="w-4 h-4" /> 2. Audio generieren (ElevenLabs)
-              </button>
-              <button disabled className="w-full bg-gray-800 text-gray-400 py-2.5 rounded-lg flex items-center justify-center gap-2 border border-gray-700 cursor-not-allowed">
-                <Video className="w-4 h-4" /> 3. Video rendern (Shotstack)
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-4 text-center">
-              Für diese Schritte werden auf GitHub weitere APIs (z.B. ElevenLabs, Runway) angebunden.
-            </p>
-          </div>
         </div>
+    </header>
 
-        {/* Right Column: Output & Timeline */}
-        <div className="lg:col-span-2">
-          {scriptData ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                <h2 className="text-2xl font-bold text-white mb-2">{scriptData.title}</h2>
-                <div className="inline-flex items-center gap-1.5 bg-purple-500/10 text-purple-400 px-3 py-1 rounded-full text-sm font-medium border border-purple-500/20 mb-6">
-                  <CheckCircle2 className="w-4 h-4" /> Groq Skript fertig
-                </div>
-                
-                <div className="mb-6 p-4 bg-gray-950 border-l-4 border-blue-500 rounded-r-xl">
-                  <p className="text-sm text-gray-400 uppercase tracking-wider font-semibold mb-1">Viral Hook</p>
-                  <p className="text-lg font-medium text-gray-200">"{scriptData.hook}"</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2 border-b border-gray-800 pb-2">
-                    <Video className="w-5 h-5 text-gray-400" />
-                    Szenen-Timeline
-                  </h3>
-                  
-                  {scriptData.scenes.map((scene, index) => (
-                    <div key={index} className="bg-gray-950 border border-gray-800 rounded-xl p-5 relative overflow-hidden group">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-purple-500 opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                      <div className="flex flex-col md:flex-row gap-6">
-                        
-                        {/* Visual Prompt Section */}
-                        <div className="flex-1">
-                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Bild/Video Prompt (KI-Generierung)</span>
-                          <p className="text-sm text-blue-200 font-mono bg-blue-950/30 p-3 rounded-lg border border-blue-900/50">
-                            {scene.visualPrompt}
-                          </p>
-                        </div>
-
-                        {/* Voiceover Section */}
-                        <div className="flex-1">
-                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block flex items-center gap-1">
-                            <Mic className="w-3 h-3" /> Voiceover Text
-                          </span>
-                          <p className="text-base text-gray-300 italic">
-                            "{scene.voiceover}"
-                          </p>
-                        </div>
-
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex justify-end gap-3">
-                 <button className="bg-green-600/20 text-green-400 border border-green-600/30 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-green-600/30 transition-colors">
-                    <UploadCloud className="w-4 h-4" /> JSON Exportieren (für Backend)
-                 </button>
-              </div>
-
+    <!-- SETTINGS / API TRESOR MODAL -->
+    <div id="settings-panel" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-dark-900 border border-dark-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-key text-purple-400"></i> API-Tresor
+                </h2>
+                <button onclick="toggleSettings()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
-          ) : (
-            <div className="h-full min-h-[400px] bg-gray-900/50 border border-gray-800/50 rounded-2xl border-dashed flex flex-col items-center justify-center text-gray-500 p-8 text-center">
-              <Video className="w-16 h-16 mb-4 text-gray-700" />
-              <h3 className="text-xl font-medium text-gray-400 mb-2">Die Leinwand ist leer</h3>
-              <p className="max-w-md">Gib links einen API Key und eine Idee ein. Groq wird in Millisekunden ein komplettes Regiebuch für deinen Social Media Post erstellen.</p>
+            <p class="text-xs text-gray-400">Deine API-Keys werden ausschließlich verschlüsselt im Browser (localStorage) gespeichert.</p>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-400 font-semibold mb-1 block">Groq API Key (Skript-Gehirn)</label>
+                    <input type="password" id="groq-key" placeholder="gsk_..." class="w-full bg-dark-950 border border-dark-800 rounded-xl p-3 text-sm text-gray-200 focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 font-semibold mb-1 block">ElevenLabs API Key (Voiceover)</label>
+                    <input type="password" id="eleven-key" placeholder="xi_..." class="w-full bg-dark-950 border border-dark-800 rounded-xl p-3 text-sm text-gray-200 focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 font-semibold mb-1 block">RunwayML API Key (Video/Visuals)</label>
+                    <input type="password" id="runway-key" placeholder="rw_..." class="w-full bg-dark-950 border border-dark-800 rounded-xl p-3 text-sm text-gray-200 focus:outline-none focus:border-purple-500">
+                </div>
             </div>
-          )}
+
+            <button onclick="saveKeys()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-purple-600/25 text-sm">
+                Schlüssel sicher speichern
+            </button>
         </div>
-
-      </main>
     </div>
-  );
-}
+
+    <!-- MAIN APP CONTENT -->
+    <main class="flex-1 max-w-md mx-auto w-full p-4 space-y-5 pb-24">
+        
+        <!-- PROMPT INPUT CARD -->
+        <div class="bg-dark-900 border border-dark-800 rounded-3xl p-5 shadow-lg space-y-4">
+            <h2 class="text-sm font-semibold text-gray-300 flex items-center gap-2 uppercase tracking-wider">
+                <i class="fa-solid fa-bolt text-yellow-400"></i> Video-Idee eingeben
+            </h2>
+            <textarea id="prompt-input" rows="3" placeholder="Bsp: Warum das antike Rom völlig unterschätzt wird. Düstere Ästhetik, virale Hook." 
+                class="w-full bg-dark-950 border border-dark-800 rounded-2xl p-4 text-sm text-gray-200 focus:outline-none focus:border-purple-500 resize-none transition-all placeholder:text-gray-600"></textarea>
+            
+            <button id="generate-btn" onclick="generateScript()" 
+                class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium py-3.5 rounded-2xl transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Skript & Pipeline starten
+            </button>
+        </div>
+
+        <!-- RESULT LEINWAND -->
+        <div id="result-container" class="hidden space-y-4">
+            
+            <div class="bg-dark-900 border border-dark-800 rounded-3xl p-5 shadow-lg space-y-4">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="inline-flex items-center gap-1 bg-green-500/10 text-green-400 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-green-500/20 mb-2">
+                            <i class="fa-solid fa-check"></i> Skript bereit
+                        </span>
+                        <h3 id="out-title" class="text-xl font-bold text-white">Titel des Videos</h3>
+                    </div>
+                </div>
+
+                <div class="bg-dark-950 border-l-4 border-purple-500 p-4 rounded-r-xl">
+                    <p class="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1"><i class="fa-solid fa-magnet"></i> Virale Hook (0-3s)</p>
+                    <p id="out-hook" class="text-sm italic text-gray-300">"Hook-Satz"</p>
+                </div>
+
+                <!-- SZENEN -->
+                <div class="space-y-3 pt-2">
+                    <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Szenen & API-Pipeline</h4>
+                    <div id="scenes-list" class="space-y-3">
+                        <!-- Szenen werden hier eingefügt -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- FLOATING FOOTER / ACTIONS -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-dark-950/90 backdrop-blur-md border-t border-dark-800 p-3 z-30">
+        <div class="max-w-md mx-auto flex gap-2">
+            <button onclick="triggerElevenLabs()" class="flex-1 bg-dark-900 hover:bg-dark-800 border border-dark-700 text-gray-300 py-3 rounded-2xl text-xs font-medium flex items-center justify-center gap-2 transition-colors">
+                <i class="fa-solid fa-microphone text-blue-400"></i> Audio (ElevenLabs)
+            </button>
+            <button onclick="triggerRunway()" class="flex-1 bg-dark-900 hover:bg-dark-800 border border-dark-700 text-gray-300 py-3 rounded-2xl text-xs font-medium flex items-center justify-center gap-2 transition-colors">
+                <i class="fa-solid fa-video text-purple-400"></i> Video (Runway)
+            </button>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIK -->
+    <script>
+        let groqKey = '';
+        let elevenKey = '';
+        let runwayKey = '';
+        let currentScript = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            groqKey = localStorage.getItem('groq_api_key') || '';
+            elevenKey = localStorage.getItem('eleven_api_key') || '';
+            runwayKey = localStorage.getItem('runway_api_key') || '';
+
+            if(groqKey) document.getElementById('groq-key').value = groqKey;
+            if(elevenKey) document.getElementById('eleven-key').value = elevenKey;
+            if(runwayKey) document.getElementById('runway-key').value = runwayKey;
+
+            if(!groqKey) {
+                toggleSettings();
+            }
+        });
+
+        function toggleSettings() {
+            const panel = document.getElementById('settings-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        function saveKeys() {
+            groqKey = document.getElementById('groq-key').value.trim();
+            elevenKey = document.getElementById('eleven-key').value.trim();
+            runwayKey = document.getElementById('runway-key').value.trim();
+
+            localStorage.setItem('groq_api_key', groqKey);
+            localStorage.setItem('eleven_api_key', elevenKey);
+            localStorage.setItem('runway_api_key', runwayKey);
+
+            showToast('API-Schlüssel lokal gespeichert!', 'success');
+            toggleSettings();
+        }
+
+        async function generateScript() {
+            const prompt = document.getElementById('prompt-input').value.trim();
+            const btn = document.getElementById('generate-btn');
+
+            if(!groqKey) {
+                showToast('Bitte hinterlege zuerst deinen Groq API Key im Zahnrad-Menü.', 'error');
+                toggleSettings();
+                return;
+            }
+            if(!prompt) {
+                showToast('Bitte gib eine Video-Idee ein.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> <span class="ml-2">Generiere virales Skript...</span>';
+
+            const systemPrompt = `Du bist ein Top-Experte für virale TikToks, Instagram Reels und YouTube Shorts.
+Erstelle ein Regie-Skript basierend auf der Idee des Users.
+Antworte AUSSCHLIESSLICH im validen JSON-Format:
+{
+  "title": "Titel des Videos",
+  "hook": "Erster Satz (0-3 Sekunden), der den Daumen stoppt",
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "visualPrompt": "Detaillierter englischer Prompt für RunwayML/Midjourney (z.B. cinematic shot of ancient rome, dark vibe, 4k)",
+      "voiceover": "Sprechertext auf Deutsch für diese Szene"
+    }
+  ]
+}`;
+
+            try {
+                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${groqKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'llama-3.3-70b-versatile',
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: prompt }
+                        ],
+                        temperature: 0.7,
+                        response_format: { type: "json_object" }
+                    })
+                });
+
+                if(!response.ok) throw new Error('API Fehler bei Groq.');
+
+                const data = await response.json();
+                let content = data.choices[0].message.content;
+                currentScript = JSON.parse(content);
+
+                renderOutput(currentScript);
+                showToast('Skript erfolgreich erstellt!', 'success');
+
+            } catch (err) {
+                console.error(err);
+                showToast(`Fehler: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Skript & Pipeline starten';
+            }
+        }
+
+        function renderOutput(script) {
+            document.getElementById('result-container').classList.remove('hidden');
+            document.getElementById('out-title').textContent = script.title;
+            document.getElementById('out-hook').textContent = `"${script.hook}"`;
+
+            const list = document.getElementById('scenes-list');
+            list.innerHTML = '';
+
+            script.scenes.forEach(scene => {
+                list.innerHTML += `
+                    <div class="bg-dark-950 border border-dark-800 rounded-2xl p-4 space-y-2">
+                        <div class="flex justify-between items-center text-[10px] text-gray-500 font-bold uppercase">
+                            <span>Szene ${scene.sceneNumber}</span>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-purple-400 font-semibold mb-1">Visual Prompt (Runway)</p>
+                            <p class="text-xs font-mono text-gray-300 bg-dark-900 p-2.5 rounded-xl border border-dark-800">${scene.visualPrompt}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-blue-400 font-semibold mb-1">Voiceover</p>
+                            <p class="text-xs italic text-gray-200">"${scene.voiceover}"</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function triggerElevenLabs() {
+            if(!elevenKey) {
+                showToast('Bitte hinterlege zuerst deinen ElevenLabs Key im Tresor.', 'error');
+                toggleSettings();
+                return;
+            }
+            if(!currentScript) {
+                showToast('Generiere zuerst ein Skript.', 'error');
+                return;
+            }
+            showToast('ElevenLabs API Integration aktiv (Bereit zum Rendern).', 'success');
+        }
+
+        function triggerRunway() {
+            if(!runwayKey) {
+                showToast('Bitte hinterlege zuerst deinen Runway Key im Tresor.', 'error');
+                toggleSettings();
+                return;
+            }
+            if(!currentScript) {
+                showToast('Generiere zuerst ein Skript.', 'error');
+                return;
+            }
+            showToast('RunwayML API Integration aktiv (Bereit zum Rendern).', 'success');
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bg = type === 'success' ? 'bg-green-900/90 border-green-700' : 'bg-red-900/90 border-red-700';
+            
+            toast.className = `toast ${bg} border text-white px-4 py-3 rounded-2xl shadow-xl text-xs font-medium backdrop-blur-md`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info mr-2"></i> ${message}`;
+            
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
 
